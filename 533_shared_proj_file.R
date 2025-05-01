@@ -1,7 +1,7 @@
 library(readxl)
 library(car)
 library (interactions)
-setwd("~/Documents/UNC/PSYC 533H")
+setwd("~/Documents/UNC/PSYC 533H/533HProject")
 dat <- read_excel("prog_data_qualtrics.xlsx")
 
 #### Part 1: Data Cleaning ####
@@ -77,6 +77,17 @@ dat$LifeSatisfaction_Total <- rowSums(dat[, c("Life Satisfaction_1", "Life Satis
 # renaming positive and negative affect columns
 names(dat)[9:10] <- c("pos_af", "neg_af")
 
+# Effect Coding Gender using other as base group
+dat$Gender <- factor(dat$Q4, levels = c(1, 2, 3), labels = c("Woman", "Man", "Other"))
+
+# coding matrix
+C <- rbind(
+  c( 1,  0),   # Woman
+  c( 0,  1),   # Man
+  c(-1, -1)    # Other (reference group in effect coding)
+)
+contrasts(dat$Gender) <- C
+
 #### Part 2: Correlations ####
 
 cor(dat[, c("Extraversion", "Agreeableness", "Conscientiousness", "Neuroticism", "Openness")],
@@ -99,6 +110,9 @@ dat$Openness_c <- dat$Openness - mean(dat$Openness, na.rm = TRUE)
 # Centering affect measures
 dat$pos_af_c <- scale(dat$pos_af, center = TRUE, scale = FALSE)
 dat$neg_af_c <- scale(dat$neg_af, center = TRUE, scale = FALSE)
+
+# Centering age
+dat$age_c <- dat$Q8 - mean(dat$Q8, na.rm = TRUE)
 
 #####
 # Main effects of Big Five
@@ -156,34 +170,94 @@ model_traits_op <- lm(LifeSatisfaction_Total ~ Openness_c, data = dat)
 summary(model_traits_op)
 
 # Gender
-model_gender <- lm(LifeSatisfaction_Total ~ Q4, data = dat)
+model_gender <- lm(LifeSatisfaction_Total ~ Gender, data = dat)
 summary(model_gender)
 
 # Gender and age
-model_gender_age <- lm(LifeSatisfaction_Total ~ Q4 + Q8, data = dat)
+model_gender_age <- lm(LifeSatisfaction_Total ~ Gender + age_c, data = dat)
 summary(model_gender_age)
 
 # Age
-model_age <- lm(LifeSatisfaction_Total ~ Q8, data = dat)
+model_age <- lm(LifeSatisfaction_Total ~ age_c, data = dat)
 summary(model_age)
 
 # Main effects of Big Five
-model_traits <- lm(LifeSatisfaction_Total ~ Extraversion_c + Agreeableness_c + Conscientiousness_c + Neuroticism_c + Openness_c + neg_af_c + pos_af_c + Q4 + Q8, data = dat)
+model_traits <- lm(LifeSatisfaction_Total ~ Extraversion_c + Agreeableness_c + Conscientiousness_c + Neuroticism_c + Openness_c + Gender + age_c, data = dat)
 summary(model_traits)
 
-# Gender
-model_gender <- lm(LifeSatisfaction_Total ~ Q4, data = dat)
+# Histogram of residuals
+hist(model_traits$residuals, col = "lightblue", prob = TRUE)
+lines(density(model_traits$residuals), col = "black", lwd = 2)
+curve(dnorm(x, mean = mean(model_traits$residuals), sd = sqrt(var(model_traits$residuals))), 
+      lwd = 2, add = TRUE, col = "red")
+
+# QQ plot
+qqnorm(model_traits$residuals)
+qqline(model_traits$residuals, lwd = 2)
+
+# Residuals vs. predicted
+plot(model_traits$fitted.values, y = model_traits$residuals, 
+     xlab = "Fitted values", ylab = "Residuals")
+abline(h = 0, lty = 2, col = "blue")
+scatter.smooth(model_traits$fitted.values, y = model_traits$residuals)
+abline(h = 0, lty = 2, col = "blue")
+
+# Residuals vs. individual predictors
+scatter.smooth(dat$Extraversion_c, y = model_traits$residuals); abline(h = 0, lty = 2, col = "blue")
+scatter.smooth(dat$Agreeableness_c, y = model_traits$residuals); abline(h = 0, lty = 2, col = "blue")
+scatter.smooth(dat$Conscientiousness_c, y = model_traits$residuals); abline(h = 0, lty = 2, col = "blue")
+scatter.smooth(dat$Neuroticism_c, y = model_traits$residuals); abline(h = 0, lty = 2, col = "blue")
+scatter.smooth(dat$Openness_c, y = model_traits$residuals); abline(h = 0, lty = 2, col = "blue")
+
+# Partial regression plots
+avPlots(model_traits)
+
+
+# Gender women 1, men 2, other 3
+model_gender <- lm(LifeSatisfaction_Total ~ Gender, data = dat)
 summary(model_gender)
 
-# Agreeableness × Positive Affect
-model_pa <- lm(LifeSatisfaction_Total ~ Q8 + Agreeableness_c * pos_af_c, data = dat)
-summary(model_pa)
-interact_plot(model_pa, pred = Agreeableness_c, modx = pos_af_c)
-sim_slopes(model_pa, pred = Agreeableness_c, modx = pos_af_c)
+# H4: The relationship between traits and life satisfaction by gender.
+model_gender_extraversion <- lm(Extraversion ~ Gender, data = dat)
+summary(model_gender_extraversion)
 
-# Neuroticism × Negative Affect
-model_pa <- lm(LifeSatisfaction_Total ~ Q8 + Neuroticism_c * neg_af_c, data = dat)
-summary(model_pa)
-interact_plot(model_pa, pred = Openness_c, modx = neg_af_c)
-sim_slopes(model_pa, pred = Openness_c, modx = neg_af_c)
+model_gender_agreeableness <- lm(Agreeableness ~ Gender, data = dat)
+summary(model_gender_agreeableness)
+
+model_gender_conscientiousness <- lm(Conscientiousness ~ Gender, data = dat)
+summary(model_gender_conscientiousness)
+
+model_gender_neuroticism <- lm(Neuroticism ~ Gender, data = dat)
+summary(model_gender_neuroticism)
+
+model_gender_openness <- lm(Openness ~ Gender, data = dat)
+summary(model_gender_openness)
+
+# Gender × Trait Interactions Predicting Life Satisfaction (H5)
+# Agreeableness × Gender
+model_agree_gender <- lm(LifeSatisfaction_Total ~ Agreeableness_c * Gender, data = dat)
+summary(model_agree_gender)
+
+interact_plot(model_agree_gender, pred = Agreeableness_c, modx = Gender)
+sim_slopes(model_agree_gender, pred = Agreeableness_c, modx = Gender)
+
+plot(model_agree_gender)
+avPlots(model_agree_gender)
+
+# Neuroticism × Gender
+model_neuro_gender <- lm(LifeSatisfaction_Total ~ Neuroticism_c * Gender, data = dat)
+summary(model_neuro_gender)
+
+interact_plot(model_neuro_gender, pred = Neuroticism_c, modx = Gender)
+sim_slopes(model_neuro_gender, pred = Neuroticism_c, modx = Gender)
+
+# Predicting Positive Affect
+model_traits_pa <- lm(pos_af ~ Extraversion_c + Agreeableness_c + Conscientiousness_c + Neuroticism_c + Openness_c, data = dat)
+summary(model_traits_pa)
+
+# Predicting Negative Affect
+model_traits_na <- lm(neg_af ~ Extraversion_c + Agreeableness_c + Conscientiousness_c + Neuroticism_c + Openness_c, data = dat)
+summary(model_traits_na)
+
+
 
