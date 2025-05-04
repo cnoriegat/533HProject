@@ -98,7 +98,7 @@ cor(dat[, c("Extraversion", "Agreeableness", "Conscientiousness", "Neuroticism",
     dat$LifeSatisfaction_Total,
     use = "pairwise.complete.obs")
 
-#### Part 2: Running the model ####
+#### Part 3: Running the model ####
 
 # Centering Big Five traits
 dat$Extraversion_c <- dat$Extraversion - mean(dat$Extraversion, na.rm = TRUE)
@@ -169,7 +169,7 @@ summary(model_traits_neu)
 model_traits_op <- lm(LifeSatisfaction_Total ~ Openness_c, data = dat)
 summary(model_traits_op)
 
-# Gender
+# Gender women 1, men 2, other 3
 model_gender <- lm(LifeSatisfaction_Total ~ Gender, data = dat)
 summary(model_gender)
 
@@ -211,11 +211,6 @@ scatter.smooth(dat$Openness_c, y = model_traits$residuals); abline(h = 0, lty = 
 
 # Partial regression plots
 avPlots(model_traits)
-
-
-# Gender women 1, men 2, other 3
-model_gender <- lm(LifeSatisfaction_Total ~ Gender, data = dat)
-summary(model_gender)
 
 # H4: The relationship between traits and life satisfaction by gender.
 model_gender_extraversion <- lm(Extraversion ~ Gender, data = dat)
